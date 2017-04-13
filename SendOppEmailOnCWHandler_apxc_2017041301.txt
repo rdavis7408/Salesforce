@@ -1,0 +1,83 @@
+public class SendOppEmailOnCWHandler {
+
+    public static void SendOppEmail(List<Opportunity> opp){
+        //Get Today's Date for Email - Format it like January 7, 2017
+        Datetime dDateTime = System.Now();
+        String dDate = dDateTime.format('MMMMM d, yyyy');
+        
+        //Get the Email Template to send when triggered
+        EmailTemplate eT = [SELECT id       , 
+                                   htmlValue, 
+                                   body 
+                            FROM EmailTemplate 
+                            WHERE developername ='Opportunity_Email_Tax2' 
+                            Limit 1];
+        
+        Set<Id> oppToSend = new Set<Id>();
+        //Check that Opp is CW and Email is to be sent
+        for (Opportunity nOpp: opp) {
+            if (nOpp.StageName == 'Committed - 100%' 
+                && nOpp.Send_Email__c == 'Yes'){
+                    oppToSend.add(nOpp.Id);
+                }
+        }
+        for(OpportunityContactRole ocr : [SELECT id                      , 
+                                                 Contact.Name            , 
+                                                 Contact.FirstName       , 
+                                                 Contact.LastName        , 
+                                                 isPrimary               ,  
+                                                 Contact.email           ,
+                                                 Opportunityid           ,
+                                                 Opportunity.Name        ,
+                                                 Opportunity.Amount      ,
+                                                 Opportunity.Owner.Name  ,
+                                                 Opportunity.Owner.Email ,
+                                                 Opportunity.Owner.phone
+                                          FROM OpportunityContactRole 
+                                          WHERE OpportunityId IN: oppToSend 
+                                          AND isPrimary = true]){
+              System.Debug('This is the OCR ID ' + ocr.id); 
+              //if there is no Opportunity Contact Role no one to send an email to
+              if (ocr.id != null) {
+                  //If the Contact Role does not have an Email Address let's not 
+                  //send them an email.
+                  if (ocr.Contact.Email != null) {
+                      System.debug('Opportunity Owner Email : '+ ocr.Opportunity.Owner.Email);
+                      Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
+                      mail.setSenderDisplayName('Sparks MicroGrants');
+                      mail.setUseSignature(false);
+                      mail.setBccSender(true);
+                      mail.setTemplateId(eT.id);
+                      mail.setTargetObjectId(ocr.ContactId);
+                      // Place in the Values for this Opportunity
+                      String htmlBody = eT.htmlValue;
+                      htmlBody = htmlBody.replace(']]>',  ' ');
+                      htmlBody = htmlBody.replace('{!Today}', dDate);
+                      htmlBody = htmlBody.replace('{!Contact.FirstName}', ocr.Contact.Name);
+                      htmlBody = htmlBody.replace('{!Opportunity.Amount}', 
+                                              String.valueOf(ocr.Opportunity.Amount));
+                      mail.setHtmlBody(htmlBody);                                                                   
+                      mail.setSaveAsActivity(True);                 
+                      Messaging.SendEmailResult[] r = Messaging.sendEmail(new Messaging.SingleEmailMessage[]{mail});
+                  }//END if (ocr.Contact.Email != null) 
+              }//END if (ocr.id != null)
+              //If and email is not sent because there was not a Opp Contact Role or an Email let the user know.
+              if (ocr.id == null || ocr.Contact.Email == null) {
+                  Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
+                  mail.setSenderDisplayName('XXXXXXXXXX'); 
+                  String aUser = String.valueOf(UserInfo.getUserEmail());
+                  System.debug('Active user email '+ aUser);
+                  String[] toAddress = new String[]{aUser};
+                  mail.setToAddresses(toAddress);
+                  String mBody ='No receipt for the Donation was sent on Opportunity : ' +ocr.Opportunity.Name;
+                  mBody = mBody +' The Opportunity ID is '+ ocr.OpportunityId;
+                  mBody = mBody + '. Check that the Contact Role is Attached to the Opportuntity';
+                  mBody = mBody + '. Also Check that the Contact has an associated email address';
+                  mBody = mBody + '. ';
+                  mail.setPlainTextBody(mBody);
+                  mail.setSubject('Email Donation Reciept not sent');
+                  Messaging.SendEmailResult[] r = Messaging.sendEmail(new Messaging.SingleEmailMessage[]{mail});
+              }//END if (ocr.id == null|| ocr.Contact.Email == null)
+       }//END for(OpportunityContactRole ocr 
+    }//END SendOppEmail Method
+} //END Class SendOppEmailOnCWHandler

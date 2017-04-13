@@ -1,0 +1,78 @@
+@isTest
+public class SendOppEmailOnCWHandlerTest {
+    
+    @isTest
+    static void TestMethodOne() {
+        Profile prof = [select id from profile where name='System Administrator'];
+        User usr = new User(alias = 'usr', email='us.name@vmail.com',
+                            emailencodingkey='UTF-8', lastname='lstname',
+                            timezonesidkey='America/Los_Angeles',
+                            languagelocalekey='en_US',
+                            localesidkey='en_US', profileid = prof.Id,
+                            username='testuser128@testorg.com',MobilePhone='87564231',Phone='451234789');
+        insert usr;
+        
+        Map<String,Schema.RecordTypeInfo> recordTypeMap = Contact.sObjectType.getDescribe().getRecordTypeInfosByName();
+                     
+        System.runAs(usr){
+        Account acct = new Account (Name = 'TEST Account ONE');
+        insert acct;
+        
+        // Create a contact
+        Contact con = new Contact (FirstName = 'Tester' ,
+                                   LastName = 'Chester' ,
+                                   Email = 'noone@nothing.com',
+                                   RecordTypeId = recordTypeMap.get('Contacts').getRecordTypeId(),
+                                   Accountid = acct.id);
+        insert con;
+        // Create a contact wo email address
+        Contact cont = new Contact (FirstName = 'Tester' ,
+                                   LastName = 'Junior' ,
+                                   RecordTypeId = recordTypeMap.get('Contacts').getRecordTypeId(),
+                                   Accountid = acct.id);
+        insert cont;
+        
+        //create a bunch of Opportunities
+        
+        List<Opportunity> bulkOpp = new List<Opportunity>();
+        for(integer i = 1 ; i <= 2; i++){
+            Opportunity opp     =  new Opportunity (Name = acct.Name + 'Opportunity ' + i ,
+                                                    Accountid = acct.id ,
+                                                    StageName = 'Committed - 100%' , 
+                                                    CloseDate = System.today().addDays(120),
+                                                    Send_Email__c = 'Yes');
+            bulkOpp.add(opp);
+        }//END for(i =1 ; i <= 10; i++)
+        insert bulkOpp;
+        //Create Opportunity Contact Roles and add to Opportunities
+        List<OpportunityContactRole> oppCR = new List<OpportunityContactRole>();
+        for(integer j = 0 ; j <= 1; j++){
+            OpportunityContactRole ocr = new OpportunityContactRole (Opportunityid = bulkOpp[j].id ,
+                                                                     Contactid = con.id ,
+                                                                     Role = 'Donor' ,
+                                                                     isPrimary =True);
+            oppCR.add(ocr);                
+        }//END for(integer j = 0 ; j <= 3; j++)
+        insert oppCR;
+        List<Opportunity> changeBulkOpp = new List<Opportunity>();
+            for(Opportunity cbo : bulkOpp){
+                cbo.Amount =3;
+                changeBulkOpp.add(cbo);
+        }
+        Update changeBulkOpp;
+        List<OpportunityContactRole> oppCRWOEmail = new List<OpportunityContactRole>();
+        for(OpportunityContactRole ocr2 : oppCR){
+            ocr2.Contactid = cont.id;
+            oppCRWOEmail.add(ocr2);                
+        }//END for(OpportunityContactRole ocr2 : oppCR)
+        Update oppCRWOEmail;
+        List<Opportunity> changeBulkOpp3 = new List<Opportunity>();
+        for(Opportunity cbo3 : bulkOpp){
+                
+                cbo3.Amount =5;
+                changeBulkOpp3.add(cbo3);
+        }//END for(Opportunity cbo3 : bulkOpp)
+        Update changeBulkOpp3;                
+        }//END System.runAs(usr)
+    } //END TestMethodOne    
+}//END Test Class

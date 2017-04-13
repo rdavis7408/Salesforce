@@ -1,0 +1,8 @@
+trigger SendOppEmailOnCW on Opportunity (after update) {
+    /// Trigger at the request of XXXXXXXXX to have an email sent to the Contact associated with the Opportunity
+    // Requested on or about 4/4/2017 - Prepared by Robert Davis
+    // Create a picklist on the Opportunity to indicate whether a email should be sent.
+    // Picklist field is Send_Email__c
+    SendOppEmailOnCWHandler.SendOppEmail(Trigger.new);
+
+}
